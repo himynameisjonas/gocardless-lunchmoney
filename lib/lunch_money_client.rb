@@ -5,7 +5,7 @@ class LunchMoneyClient
   BASE_URL = "https://dev.lunchmoney.app/v1"
 
   def create_transactions(transactions:)
-    post("/transactions", {transactions:})
+    post("/transactions", {transactions:, debit_as_negative: true})
   end
 
   private

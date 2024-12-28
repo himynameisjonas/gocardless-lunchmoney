@@ -8,9 +8,9 @@ class BankSync
   end
 
   def sync
-    # check_requisitions
+    check_requisitions
     sync_accounts
-    # sync_transactions
+    sync_transactions
   end
 
   def sync_accounts
@@ -55,8 +55,6 @@ class BankSync
       end
     end
   end
-
-  private
 
   def check_requisitions
     puts "Checking requisitions..."
@@ -117,6 +115,8 @@ class BankSync
       })
     end
   end
+
+  private
 
   def notify_expired_requisition(requisition)
     message = "Bank Sync: Connection Expired\n"

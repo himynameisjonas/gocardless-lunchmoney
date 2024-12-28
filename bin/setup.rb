@@ -16,6 +16,10 @@ OptionParser.new do |opts|
     options[:create] = id
   end
 
+  opts.on("--sync-accounts", "Sync accounts from GoCardless") do |id|
+    options[:sync_accounts] = true
+  end
+
   opts.on("--list-accounts", "List accounts and mapping to Lunch Money") do |id|
     options[:list_accounts] = true
   end
@@ -35,8 +39,10 @@ OptionParser.new do |opts|
 end.parse!
 
 setup = BankSetup.new
-
-if options[:list_accounts]
+if options[:sync_accounts]
+  puts "Syncing accounts from GoCardless"
+  setup.sync_accounts
+elsif options[:list_accounts]
   accounts = Account.all
   if accounts.empty?
     puts "No accounts found"

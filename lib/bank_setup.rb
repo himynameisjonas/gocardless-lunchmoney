@@ -8,6 +8,7 @@ class BankSetup
   end
 
   def sync_accounts
+    @bank_sync.check_requisitions
     @bank_sync.sync_accounts
   end
 
