@@ -4,21 +4,8 @@ require "json"
 class LunchMoneyClient
   BASE_URL = "https://dev.lunchmoney.app/v1"
 
-  def initialize(access_token:)
-    @access_token = access_token
-  end
-
-  def create_transaction(date:, amount:, currency:, payee:, notes: nil, external_id: nil)
-    post("/transactions", {
-      transactions: [{
-        date: date,
-        amount: amount,
-        currency: currency,
-        payee: payee,
-        notes: notes,
-        external_id: external_id
-      }]
-    })
+  def create_transactions(transactions:)
+    post("/transactions", {transactions:})
   end
 
   private
@@ -29,11 +16,15 @@ class LunchMoneyClient
     http.use_ssl = true
 
     request = Net::HTTP::Post.new(uri)
-    request["Authorization"] = "Bearer #{@access_token}"
+    request["Authorization"] = "Bearer #{ENV.fetch("LUNCHMONEY_ACCESS_TOKEN")}"
     request["Content-Type"] = "application/json"
     request.body = body.to_json
 
     response = http.request(request)
+    puts "Response code: #{response.code}"
+    puts "Body:"
+    puts response.body
+
     handle_response(response)
   end
 

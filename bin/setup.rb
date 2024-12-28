@@ -8,12 +8,24 @@ options = {}
 OptionParser.new do |opts|
   opts.banner = "Usage: setup.rb [options]"
 
-  opts.on("-l", "--list-banks [COUNTRY]", "List available banks for country code (defaults to SE)") do |country|
+  opts.on("--list-banks [COUNTRY]", "List available banks for country code (defaults to SE)") do |country|
     options[:list] = country || "SE"
   end
 
-  opts.on("-c", "--create-requisition INSTITUTION_ID", "Create a new requisition for institution") do |id|
+  opts.on("--create-requisition INSTITUTION_ID", "Create a new requisition for institution") do |id|
     options[:create] = id
+  end
+
+  opts.on("--list-accounts", "List accounts and mapping to Lunch Money") do |id|
+    options[:list_accounts] = true
+  end
+
+  opts.on("--map_account [ACCOUNT_ID]", "Map GoCardless Account id") do |account_id|
+    options[:map_account] = account_id
+  end
+
+  opts.on("--map_asset [ASSET_ID]", "Map Lunch Money asset id") do |asset_id|
+    options[:map_asset] = asset_id
   end
 
   opts.on("-h", "--help", "Show this help message") do
@@ -24,7 +36,40 @@ end.parse!
 
 setup = BankSetup.new
 
-if options[:list]
+if options[:list_accounts]
+  accounts = Account.all
+  if accounts.empty?
+    puts "No accounts found"
+    exit 1
+  end
+
+  puts "-" * 50
+  accounts.each do |acc|
+    puts "\e[1m#{acc[:name]}\e[0m"  # Bold name
+    puts "ID: #{acc[:account_id]}"
+    puts "Name: #{acc[:name]}"
+    puts "Insitution: #{acc.requisition.institution_id}"
+    puts "Lunch Money ID: #{acc[:lunch_money_id]}"
+    puts "Status: #{acc[:status]}"
+    puts "Last Synced: #{acc[:last_synced_at]}"
+    puts "-" * 50
+  end
+elsif options[:map_account] || options[:map_asset]
+  account_id = options[:map_account]
+  asset_id = options[:map_asset]
+  if account_id.nil? || asset_id.nil?
+    puts "Please specify both --map_account and --map_asset"
+    exit 1
+  end
+
+  puts "Mapping account: #{account_id} to asset: #{asset_id}"
+  account = Account.where(account_id: account_id).first
+  if account.nil?
+    puts "Account not found"
+    exit 1
+  end
+  account.update(lunch_money_id: asset_id)
+elsif options[:list]
   country = options[:list].upcase
   puts "Fetching banks for country: #{country}"
   puts "-" * 50

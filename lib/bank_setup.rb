@@ -1,8 +1,14 @@
 require_relative "nordigen_client"
+require_relative "bank_sync"
 
 class BankSetup
   def initialize
     @nordigen = NordigenClient.new
+    @bank_sync = BankSync.new
+  end
+
+  def sync_accounts
+    @bank_sync.sync_accounts
   end
 
   def list_institutions(country_code = "SE")

@@ -1,9 +1,7 @@
 require "bundler"
 Bundler.require(:default)
 require "logger"
-require "dotenv"
-
-Dotenv.load
+require "dotenv/load"
 
 DB = Sequel.connect("sqlite://db/bank_sync.db")
 LOGGER = Logger.new($stdout)
@@ -18,6 +16,5 @@ NORDIGEN_CONFIG = {
   secret_key: ENV.fetch("NORDIGEN_SECRET_KEY")
 }
 
-LUNCH_MONEY_CONFIG = {
-  access_token: ENV.fetch("LUNCH_MONEY_TOKEN")
-}
+# require all files in lib
+Dir[File.join(__dir__, "lib", "*.rb")].each { |file| require file }
