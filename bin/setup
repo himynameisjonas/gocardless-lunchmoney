@@ -5,7 +5,7 @@ require_relative "../config"
 require_relative "../lib/bank_setup"
 
 options = {}
-OptionParser.new do |opts|
+opts = OptionParser.new do |opts|
   opts.banner = "Usage: setup.rb [options]"
 
   opts.on("--list-banks [COUNTRY]", "List available banks for country code (defaults to SE)") do |country|
@@ -36,7 +36,9 @@ OptionParser.new do |opts|
     puts opts
     exit
   end
-end.parse!
+end
+
+opts.parse!
 
 setup = BankSetup.new
 if options[:sync_accounts]
@@ -107,10 +109,6 @@ elsif options[:create]
     exit 1
   end
 else
-  puts "Please specify either --list-banks or --create-requisition"
-  puts "Example usage:"
-  puts "  #{$PROGRAM_NAME} --list-banks         # List Swedish banks"
-  puts "  #{$PROGRAM_NAME} --list-banks NO      # List Norwegian banks"
-  puts "  #{$PROGRAM_NAME} --create-requisition BANK_ID"
+  puts opts
   exit 1
 end
