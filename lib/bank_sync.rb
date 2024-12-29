@@ -116,7 +116,7 @@ class BankSync
 
   def push_transactions
     puts "Pushing transactions..."
-    Transaction.where(synced_at: nil).each do |transaction|
+    Transaction.where(synced_at: nil).reverse_each do |transaction|
       puts "Syncing #{transaction.id}"
       puts "External_id: #{transaction.external_id}"
 
