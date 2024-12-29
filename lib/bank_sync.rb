@@ -2,6 +2,8 @@ require_relative "nordigen_client"
 require_relative "lunch_money_client"
 
 class BankSync
+  ONE_DAY = 24 * 60 * 60
+
   def initialize
     @nordigen = NordigenClient.new
     @lunch_money = LunchMoneyClient.new
@@ -15,9 +17,9 @@ class BankSync
 
   def sync_accounts
     puts "Syncing accounts..."
-    DB[:requisitions].where(status: "LN").each do |req|
-      requisition = @nordigen.get_requisition(req[:requisition_id])
-      puts "Syncing accounts for requisition: #{req[:requisition_id]}"
+    Requisition.where(status: "LN").each do |req|
+      requisition = @nordigen.get_requisition(req.requisition_id)
+      puts "Syncing accounts for requisition: #{req.requisition_id}"
 
       requisition["accounts"].each do |account_id|
         puts "Syncing account: #{account_id}"
@@ -35,16 +37,14 @@ class BankSync
           puts "Updating existing account"
           account.update(
             name: name || account.name,
-            status: status,
-            last_synced_at: Time.now
+            status: status
           )
         else
           puts "Creating new account"
           Account.create(
             account_id: account_id,
-            requisition_id: req[:id],
+            requisition_id: req.id,
             status: status,
-            last_synced_at: Time.now,
             name: name
           )
         end
@@ -58,14 +58,14 @@ class BankSync
 
   def check_requisitions
     puts "Checking requisitions..."
-    DB[:requisitions].each do |req|
-      puts "Checking requisition: #{req[:requisition_id]}"
-      requisition = @nordigen.get_requisition(req[:requisition_id])
+    Requisition.each do |req|
+      puts "Checking requisition: #{req.requisition_id}"
+      requisition = @nordigen.get_requisition(req.requisition_id)
       puts "Requisition status: #{requisition["status"]}"
 
       current_status = requisition["status"]
-      if current_status != req[:status]
-        DB[:requisitions].where(id: req[:id]).update(
+      if current_status != req.status
+        Requisition.where(id: req.id).first.update(
           status: requisition["status"],
           last_synced_at: Time.now
         )
@@ -84,10 +84,11 @@ class BankSync
 
   def sync_transactions
     puts "Syncing transactions..."
-    Account.where(lunch_money_id: nil).invert.where(status: "READY").each do |account|
+    Account.where(lunch_money_id: nil).invert.where(status: "READY", last_synced_at: ..(Time.now - ONE_DAY)).each do |account|
       puts "Syncing transactions for account: #{account[:account_id]}"
       response = @nordigen.get_account_transactions(account[:account_id])
       booked_transactions = response.dig("transactions", "booked")
+      account.update(last_synced_at: Time.now)
 
       if booked_transactions
         puts "Found #{booked_transactions.size} transactions"

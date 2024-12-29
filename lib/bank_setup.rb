@@ -28,7 +28,7 @@ class BankSetup
     requisition = @nordigen.create_requisition(institution_id)
 
     # Store requisition in database
-    DB[:requisitions].insert(
+    Requsition.create(
       requisition_id: requisition["id"],
       institution_id: institution_id,
       status: requisition["status"],
