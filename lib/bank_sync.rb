@@ -2,7 +2,7 @@ require_relative "nordigen_client"
 require_relative "lunch_money_client"
 
 class BankSync
-  ONE_DAY = 24 * 60 * 60
+  SYNC_INTERVAL = 8 * 60 * 60 # 8 hours
 
   def initialize
     @nordigen = NordigenClient.new
@@ -12,7 +12,8 @@ class BankSync
   def sync
     check_requisitions
     sync_accounts
-    sync_transactions
+    fetch_transactions
+    push_transactions
   end
 
   def sync_accounts
@@ -82,10 +83,10 @@ class BankSync
     end
   end
 
-  def sync_transactions
-    puts "Syncing transactions..."
-    Account.where(lunch_money_id: nil).invert.where(status: "READY", last_synced_at: ..(Time.now - ONE_DAY)).each do |account|
-      puts "Syncing transactions for account: #{account[:account_id]}"
+  def fetch_transactions
+    puts "Fetching transactions..."
+    Account.where(lunch_money_id: nil).invert.where(status: "READY", last_synced_at: ..(Time.now - SYNC_INTERVAL)).each do |account|
+      puts "fetching transactions for account: #{account[:account_id]}"
       response = @nordigen.get_account_transactions(account[:account_id])
       booked_transactions = response.dig("transactions", "booked")
       account.update(last_synced_at: Time.now)
@@ -101,19 +102,45 @@ class BankSync
         next
       end
 
-      @lunch_money.create_transactions(transactions: booked_transactions.map { |tx|
+      booked_transactions.each do |tx|
         puts "Creating transaction"
         puts tx
-        {
-          amount: tx["transactionAmount"]["amount"].to_f,
-          external_id: tx["transactionId"],
-          currency: tx["transactionAmount"]["currency"].downcase,
-          date: tx["bookingDate"],
-          payee: tx["creditorName"] || tx["remittanceInformationUnstructuredArray"]&.join(", "),
-          status: "cleared",
-          asset_id: account.lunch_money_id
-        }
-      })
+        puts "*" * 50
+        Transaction.find_or_create(external_id: tx["transactionId"]) do |t|
+          t.data = tx
+          t.account_id = account.id
+        end
+      end
+    end
+  end
+
+  def push_transactions
+    puts "Pushing transactions..."
+    Transaction.where(synced_at: nil).each do |transaction|
+      puts "Syncing #{transaction.id}"
+      puts "External_id: #{transaction.external_id}"
+
+      begin
+        @lunch_money.create_transactions(transactions: [transaction].map { |tx|
+          {
+            amount: tx.data["transactionAmount"]["amount"].to_f,
+            external_id: tx.data["transactionId"],
+            currency: tx.data["transactionAmount"]["currency"].downcase,
+            date: tx.data["bookingDate"],
+            payee: tx.data["creditorName"] || tx.data["remittanceInformationUnstructuredArray"]&.join(", "),
+            status: "cleared",
+            asset_id: tx.account.lunch_money_id
+          }
+        })
+        transaction.update(synced_at: Time.now)
+      rescue => e
+        puts "Error: #{e}"
+        if e.message.match?(/Key.*user_external_id.*already exists./)
+          transaction.update(synced_at: Time.now, error: e.message)
+        else
+          transaction.update(synced_at: nil, error: e.message)
+        end
+      end
     end
   end
 

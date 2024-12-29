@@ -5,7 +5,12 @@ class LunchMoneyClient
   BASE_URL = "https://dev.lunchmoney.app/v1"
 
   def create_transactions(transactions:)
-    post("/transactions", {transactions:, debit_as_negative: true})
+    post("/transactions", {
+      transactions:,
+      debit_as_negative: true,
+      apply_rules: true,
+      check_for_recurring: true
+    })
   end
 
   private
@@ -31,7 +36,12 @@ class LunchMoneyClient
   def handle_response(response)
     case response.code.to_i
     when 200, 201
-      JSON.parse(response.body)
+      json = JSON.parse(response.body)
+      if json["error"]
+        raise "API Error: #{json["error"]}"
+      else
+        json
+      end
     when 401
       raise "Unauthorized: Invalid access token"
     when 409
