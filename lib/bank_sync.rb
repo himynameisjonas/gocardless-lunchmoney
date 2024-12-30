@@ -1,6 +1,3 @@
-require_relative "nordigen_client"
-require_relative "lunch_money_client"
-
 class BankSync
   SYNC_INTERVAL = 8 * 60 * 60 # 8 hours
 
@@ -17,31 +14,24 @@ class BankSync
   end
 
   def sync_accounts
-    puts "Syncing accounts..."
+    LOGGER.info "Syncing accounts..."
     Requisition.where(status: "LN").each do |req|
       requisition = @nordigen.get_requisition(req.requisition_id)
-      puts "Syncing accounts for requisition: #{req.requisition_id}"
 
       requisition["accounts"].each do |account_id|
-        puts "Syncing account: #{account_id}"
+        LOGGER.info "Syncing account: #{account_id}"
         metadata = @nordigen.get_account_metadata(account_id)
         details = @nordigen.get_account_details(account_id)
-        puts "*" * 50
-        puts metadata
-        puts "*" * 50
-        puts details
 
         name = details.dig("account", "name")
         status = metadata["status"]
 
         if (account = Account.where(account_id:).first)
-          puts "Updating existing account"
           account.update(
             name: name || account.name,
             status: status
           )
         else
-          puts "Creating new account"
           Account.create(
             account_id: account_id,
             requisition_id: req.id,
@@ -58,11 +48,9 @@ class BankSync
   end
 
   def check_requisitions
-    puts "Checking requisitions..."
+    LOGGER.info "Checking requisitions..."
     Requisition.each do |req|
-      puts "Checking requisition: #{req.requisition_id}"
       requisition = @nordigen.get_requisition(req.requisition_id)
-      puts "Requisition status: #{requisition["status"]}"
 
       current_status = requisition["status"]
       if current_status != req.status
@@ -78,23 +66,23 @@ class BankSync
       when "SU" # Link Needed or Suspended
         notify_reauthorization_needed(req)
       else
-        puts "No action required"
+        LOGGER.info "No action required"
       end
     end
   end
 
   def fetch_transactions
-    puts "Fetching transactions..."
+    LOGGER.info "Fetching transactions..."
     Account.where(lunch_money_id: nil).invert.where(status: "READY", last_synced_at: ..(Time.now - SYNC_INTERVAL)).each do |account|
-      puts "fetching transactions for account: #{account[:account_id]}"
+      LOGGER.info "fetching transactions for account: #{account[:account_id]}"
       response = @nordigen.get_account_transactions(account[:account_id])
       booked_transactions = response.dig("transactions", "booked")
       account.update(last_synced_at: Time.now)
 
       if booked_transactions
-        puts "Found #{booked_transactions.size} transactions"
+        LOGGER.info "Found #{booked_transactions.size} transactions"
       else
-        puts "No transactions found"
+        LOGGER.info "No transactions found"
         if response["status_code"] >= 400
           notify_account_issue(account[:account_id], response["detail"])
         end
@@ -103,9 +91,6 @@ class BankSync
       end
 
       booked_transactions.each do |tx|
-        puts "Creating transaction"
-        puts tx
-        puts "*" * 50
         Transaction.find_or_create(external_id: tx["transactionId"]) do |t|
           t.data = tx
           t.account_id = account.id
@@ -115,31 +100,25 @@ class BankSync
   end
 
   def push_transactions
-    puts "Pushing transactions..."
+    LOGGER.info "Pushing transactions..."
     Transaction.where(synced_at: nil).reverse_each do |transaction|
-      puts "Syncing #{transaction.id}"
-      puts "External_id: #{transaction.external_id}"
-
-      begin
-        @lunch_money.create_transactions(transactions: [transaction].map { |tx|
-          {
-            amount: tx.data["transactionAmount"]["amount"].to_f,
-            external_id: tx.data["transactionId"],
-            currency: tx.data["transactionAmount"]["currency"].downcase,
-            date: tx.data["bookingDate"],
-            payee: tx.data["creditorName"] || tx.data["remittanceInformationUnstructuredArray"]&.join(", "),
-            status: "cleared",
-            asset_id: tx.account.lunch_money_id
-          }
-        })
-        transaction.update(synced_at: Time.now)
-      rescue => e
-        puts "Error: #{e}"
-        if e.message.match?(/Key.*user_external_id.*already exists./)
-          transaction.update(synced_at: Time.now, error: e.message)
-        else
-          transaction.update(synced_at: nil, error: e.message)
-        end
+      @lunch_money.create_transactions(transactions: [transaction].map { |tx|
+        {
+          amount: tx.data["transactionAmount"]["amount"].to_f,
+          external_id: tx.data["transactionId"],
+          currency: tx.data["transactionAmount"]["currency"].downcase,
+          date: tx.data["bookingDate"],
+          payee: tx.data["creditorName"] || tx.data["remittanceInformationUnstructuredArray"]&.join(", "),
+          status: "cleared",
+          asset_id: tx.account.lunch_money_id
+        }
+      })
+      transaction.update(synced_at: Time.now)
+    rescue => e
+      if e.message.match?(/Key.*user_external_id.*already exists./)
+        transaction.update(synced_at: Time.now, error: e.message)
+      else
+        transaction.update(synced_at: nil, error: e.message)
       end
     end
   end
@@ -165,8 +144,6 @@ class BankSync
   end
 
   def pushover_message(message)
-    puts "Sending Pushover message"
-    puts message
     Pushover::Message.new(token: ENV["PUSHOVER_TOKEN"], user: ENV["PUSHOVER_USER"], message:).push
   end
 end

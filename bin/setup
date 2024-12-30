@@ -2,7 +2,6 @@
 
 require "optparse"
 require_relative "../config"
-require_relative "../lib/bank_setup"
 
 options = {}
 opts = OptionParser.new do |opts|

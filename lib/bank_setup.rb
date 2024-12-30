@@ -1,6 +1,3 @@
-require_relative "nordigen_client"
-require_relative "bank_sync"
-
 class BankSetup
   def initialize
     @nordigen = NordigenClient.new

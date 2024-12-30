@@ -1,5 +1,3 @@
-require "nordigen-ruby"
-
 class NordigenClient
   def initialize
     @client = Nordigen::NordigenClient.new(
