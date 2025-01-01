@@ -1,0 +1,3 @@
+.env
+db/bank_sync.db
+Dockerfile
