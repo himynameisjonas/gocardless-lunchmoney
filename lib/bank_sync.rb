@@ -4,6 +4,7 @@ class BankSync
   def initialize
     @nordigen = NordigenClient.new
     @lunch_money = LunchMoneyClient.new
+    @pushover = Pushover.new
   end
 
   def sync
@@ -128,22 +129,18 @@ class BankSync
   def notify_expired_requisition(requisition)
     message = "Bank Sync: Connection Expired\n"
     message += "Bank connection expired for #{requisition[:institution_id]}. Please create a new requisition."
-    pushover_message(message)
+    @pushover.push(message)
   end
 
   def notify_reauthorization_needed(requisition)
     message = "Bank Sync: Reauthorization Needed\n"
     message += "Bank connection needs reauthorization for #{requisition[:institution_id]}."
-    pushover_message(message)
+    @pushover.push(message)
   end
 
   def notify_account_issue(account_id, status)
     message = "Bank Sync: Account Issue\n"
     message += "Account #{account_id} has status: #{status}."
-    pushover_message(message)
-  end
-
-  def pushover_message(message)
-    Pushover::Message.new(token: ENV["PUSHOVER_TOKEN"], user: ENV["PUSHOVER_USER"], message:).push
+    @pushover.push(message)
   end
 end
