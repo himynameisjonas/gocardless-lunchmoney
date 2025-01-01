@@ -2,6 +2,27 @@
 
 require_relative "../config"
 
+options = {}
+opts = OptionParser.new do |opts|
+  opts.banner = "Usage: sync [options]"
+
+  opts.on("--interval [hours]", "Run the sync ever X hours") do |hours|
+    options[:interval] = hours.nil? ? 8 : hours.to_i
+  end
+
+  opts.on("-h", "--help", "Show this help message") do
+    puts opts
+    exit
+  end
+end
+
+opts.parse!
+
+
 LOGGER.info "Starting bank sync..."
 BankSync.new.sync
 LOGGER.info "Bank sync completed!"
+if options[:interval]
+  LOGGER.info "Sleeping for #{options[:interval]} hours"
+  sleep options[:interval] * 60 * 60
+end
