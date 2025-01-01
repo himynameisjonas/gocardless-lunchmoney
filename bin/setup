@@ -5,7 +5,7 @@ require_relative "../config"
 
 options = {}
 opts = OptionParser.new do |opts|
-  opts.banner = "Usage: setup.rb [options]"
+  opts.banner = "Usage: setup [options]"
 
   opts.on("--list-banks [COUNTRY]", "List available banks for country code (defaults to SE)") do |country|
     options[:list] = country || "SE"
