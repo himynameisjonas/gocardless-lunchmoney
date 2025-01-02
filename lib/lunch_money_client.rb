@@ -21,7 +21,7 @@ class LunchMoneyClient
     http.use_ssl = true
 
     request = Net::HTTP::Post.new(uri)
-    request["Authorization"] = "Bearer #{ENV.fetch("LUNCHMONEY_ACCESS_TOKEN")}"
+    request["Authorization"] = "Bearer #{LUNCH_MONEY_CONFIG[:access_token]}"
     request["Content-Type"] = "application/json"
     request.body = body.to_json
 

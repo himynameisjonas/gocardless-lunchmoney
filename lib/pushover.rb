@@ -1,14 +1,14 @@
 class Pushover
   def push(message)
-    if ENV["PUSHOVER_TOKEN"].nil? || ENV["PUSHOVER_USER"].nil?
+    if PUSHOVER_CONFIG[:token].nil? || PUSHOVER_CONFIG[:user].nil?
       return LOGGER.error "Pushover token or user not set"
     end
 
     uri = URI.parse("https://api.pushover.net/1/messages.json")
     request = Net::HTTP::Post.new(uri)
     request.set_form_data(
-      "token" => ENV["PUSHOVER_TOKEN"],
-      "user" => ENV["PUSHOVER_USER"],
+      "token" => PUSHOVER_CONFIG[:token],
+      "user" => PUSHOVER_CONFIG[:user],
       "message" => message
     )
     response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) do |http|

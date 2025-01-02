@@ -1,9 +1,6 @@
 class NordigenClient
   def initialize
-    @client = Nordigen::NordigenClient.new(
-      secret_id: ENV.fetch("NORDIGEN_SECRET_ID"),
-      secret_key: ENV.fetch("NORDIGEN_SECRET_KEY")
-    )
+    @client = Nordigen::NordigenClient.new(**NORDIGEN_CONFIG)
     @client.generate_token
   end
 
@@ -37,5 +34,9 @@ class NordigenClient
 
   def get_account_transactions(account_id)
     get_account(account_id).get_transactions
+  end
+
+  def get_account_balance(account_id)
+    get_account(account_id).get_balance
   end
 end
