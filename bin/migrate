@@ -1,10 +1,11 @@
 #!/usr/bin/env ruby
-
-require_relative "../config"
+require "bundler"
+Bundler.require(:default)
+require "logger"
+require "dotenv/load"
 require "fileutils"
-
-# Ensure db directory exists
-FileUtils.mkdir_p("db")
+DB = Sequel.connect("sqlite://db/bank_sync.db")
+LOGGER = Logger.new($stdout)
 
 # Run migrations
 Sequel.extension :migration
