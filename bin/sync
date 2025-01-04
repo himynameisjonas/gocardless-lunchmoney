@@ -19,10 +19,15 @@ end
 opts.parse!
 
 
-LOGGER.info "Starting bank sync..."
-BankSync.new.sync
-LOGGER.info "Bank sync completed!"
-if options[:interval]
-  LOGGER.info "Sleeping for #{options[:interval]} hours"
-  sleep options[:interval] * 60 * 60
+loop do
+  LOGGER.info "Starting bank sync..."
+  BankSync.new.sync
+  LOGGER.info "Bank sync completed!"
+
+  if options[:interval]
+    LOGGER.info "Sleeping for #{options[:interval]} hours"
+    sleep options[:interval] * 60 * 60
+  else
+    break
+  end
 end
