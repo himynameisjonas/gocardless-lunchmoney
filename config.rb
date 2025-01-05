@@ -4,6 +4,8 @@ require "logger"
 require "dotenv/load"
 
 DB = Sequel.connect("sqlite://db/bank_sync.db")
+
+$stdout.sync = true
 LOGGER = Logger.new($stdout)
 
 begin
