@@ -108,7 +108,7 @@ class BankSync
           amount: tx.data["transactionAmount"]["amount"].to_f,
           external_id: tx.data["transactionId"],
           currency: tx.data["transactionAmount"]["currency"].downcase,
-          date: tx.data["bookingDate"],
+          date: tx.data["valueDate"] || tx.data["bookingDate"],
           payee: tx.data["creditorName"] || tx.data["remittanceInformationUnstructuredArray"]&.join(", "),
           status: "cleared",
           asset_id: tx.account.lunch_money_id
