@@ -128,7 +128,7 @@ class BankSync
 
   def notify_expired_requisition(requisition)
     message = "Bank Sync: Connection Expired\n"
-    message += "Bank connection expired for #{requisition[:institution_id]}. Please create a new requisition."
+    message += "Bank connection expired for #{requisition[:institution_id]}. Please recreate the requisition."
     @pushover.push(message)
   end
 

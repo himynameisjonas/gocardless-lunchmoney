@@ -64,6 +64,14 @@ To create a new requisition for a bank:
 docker compose run gocardless-lunchmoney setup --create-requisition INSTITUTION_ID
 ```
 
+### Recreate Expired Requisition
+
+To recreate a expired requisition:
+
+```sh
+docker compose run gocardless-lunchmoney setup --recreate-requisition
+```
+
 ### Sync Accounts
 
 To sync accounts from GoCardless:
