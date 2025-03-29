@@ -15,6 +15,10 @@ opts = OptionParser.new do |opts|
     options[:create] = id
   end
 
+  opts.on("--recreate-requisition [INSTITUTION_ID]", "Recreate expired requisition") do |id|
+    options[:recreate] = id || true
+  end
+
   opts.on("--sync-accounts", "Sync accounts from GoCardless") do |id|
     options[:sync_accounts] = true
   end
@@ -100,6 +104,17 @@ elsif options[:create]
   puts "Creating requisition for institution: #{options[:create]}"
   begin
     link = setup.create_requisition(options[:create])
+    puts "\n\e[32mSuccess!\e[0m Please visit this URL to authorize access to your bank:"
+    puts "\e[1m#{link}\e[0m"
+    puts "\nAfter authorization, the requisition will be automatically tracked and synced."
+  rescue => e
+    puts "\e[31mError:\e[0m #{e.message}"
+    exit 1
+  end
+elsif options[:recreate]
+  puts "Recreating requisition"
+  begin
+    link = setup.recreate_requisition(options[:recreate])
     puts "\n\e[32mSuccess!\e[0m Please visit this URL to authorize access to your bank:"
     puts "\e[1m#{link}\e[0m"
     puts "\nAfter authorization, the requisition will be automatically tracked and synced."

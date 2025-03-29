@@ -36,4 +36,28 @@ class BankSetup
 
     requisition["link"]
   end
+
+  def recreate_requisition(optional_id)
+    expired_requisition = if optional_id && optional_id != true
+      Requisition.where(id: optional_id).first
+    else
+      Requisition.where(status: "EX").all.sample
+    end
+    raise "No expired requisition found" unless expired_requisition
+
+    puts "Found a expired #{expired_requisition.institution_id} requisition"
+
+    requisition = @nordigen.create_requisition(expired_requisition.institution_id)
+
+    # Store requisition in database
+    expired_requisition.update(
+      requisition_id: requisition["id"],
+      institution_id: expired_requisition.institution_id,
+      status: requisition["status"],
+      last_synced_at: Time.now,
+      expires_at: Time.now + (90 * 24 * 60 * 60) # 90 days
+    )
+
+    requisition["link"]
+  end
 end
