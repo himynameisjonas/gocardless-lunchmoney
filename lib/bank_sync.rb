@@ -24,7 +24,7 @@ class BankSync
         metadata = @nordigen.get_account_metadata(account_id)
         details = @nordigen.get_account_details(account_id)
 
-        name = details.dig("account", "name")
+        name = details.dig("account", "name") || details.dig("account", "product")
         status = metadata["status"]
 
         if (account = Account.where(account_id:).first)
