@@ -15,7 +15,7 @@ opts = OptionParser.new do |opts|
     options[:create] = id
   end
 
-  opts.on("--recreate-requisition [INSTITUTION_ID]", "Recreate expired requisition") do |id|
+  opts.on("--recreate-requisition [ID]", "Recreate an expired (EX), suspended (SU), or LN requisition with suspended/errored accounts. Optional ID is the internal requisition row id.") do |id|
     options[:recreate] = id || true
   end
 

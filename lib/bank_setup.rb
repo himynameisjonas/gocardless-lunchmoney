@@ -38,26 +38,50 @@ class BankSetup
   end
 
   def recreate_requisition(optional_id)
-    expired_requisition = if optional_id && optional_id != true
-      Requisition.where(id: optional_id).first
-    else
-      Requisition.where(status: "EX").all.sample
-    end
-    raise "No expired requisition found" unless expired_requisition
+    target = pick_requisition_to_recreate(optional_id)
+    raise "No expired/suspended requisition or LN requisition with sick accounts found" unless target
 
-    puts "Found a expired #{expired_requisition.institution_id} requisition"
+    puts "Found requisition for #{target.institution_id} (status=#{target.status})"
 
-    requisition = @nordigen.create_requisition(expired_requisition.institution_id)
+    backfill_account_metadata(target)
 
-    # Store requisition in database
-    expired_requisition.update(
+    requisition = @nordigen.create_requisition(target.institution_id)
+
+    target.update(
       requisition_id: requisition["id"],
-      institution_id: expired_requisition.institution_id,
       status: requisition["status"],
       last_synced_at: Time.now,
       expires_at: Time.now + (90 * 24 * 60 * 60) # 90 days
     )
 
     requisition["link"]
+  end
+
+  private
+
+  def pick_requisition_to_recreate(optional_id)
+    if optional_id && optional_id != true
+      return Requisition.where(id: optional_id).first
+    end
+
+    candidate = Requisition.where(status: ["EX", "SU"]).all.sample
+    return candidate if candidate
+
+    Requisition.where(status: "LN").all.find do |req|
+      Account.where(requisition_id: req.id, status: ["SUSPENDED", "ERROR", "EXPIRED"]).any?
+    end
+  end
+
+  def backfill_account_metadata(requisition)
+    Account.where(requisition_id: requisition.id).each do |account|
+      metadata = @nordigen.get_account_metadata(account[:account_id])
+      account.update(
+        iban: metadata["iban"] || account.iban,
+        owner_name: metadata["owner_name"] || account.owner_name,
+        status: metadata["status"] || account.status
+      )
+    rescue => e
+      puts "Warning: could not refresh metadata for account #{account[:account_id]}: #{e.message}"
+    end
   end
 end

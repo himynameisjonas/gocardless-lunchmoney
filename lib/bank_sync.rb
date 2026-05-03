@@ -18,31 +18,43 @@ class BankSync
     LOGGER.info "Syncing accounts..."
     Requisition.where(status: "LN").each do |req|
       requisition = @nordigen.get_requisition(req.requisition_id)
+      current_account_ids = requisition["accounts"]
 
-      requisition["accounts"].each do |account_id|
+      current_account_ids.each do |account_id|
         LOGGER.info "Syncing account: #{account_id}"
         metadata = @nordigen.get_account_metadata(account_id)
         details = @nordigen.get_account_details(account_id)
 
-        name = details.dig("account", "name") || details.dig("account", "product")
+        iban = metadata["iban"]
+        owner_name = metadata["owner_name"]
         status = metadata["status"]
+        name = details.dig("account", "name") ||
+               details.dig("account", "product") ||
+               (metadata["name"].to_s.empty? ? nil : metadata["name"])
 
-        if (account = Account.where(account_id:).first)
+        account = Account.where(account_id: account_id).first
+        account ||= reconcile_renamed_account(req, current_account_ids, iban, account_id)
+
+        if account
+          previous_status = account[:status]
           account.update(
+            account_id: account_id,
             name: name || account.name,
-            status: status
+            status: status,
+            iban: iban || account.iban,
+            owner_name: owner_name || account.owner_name
           )
+          notify_status_change(account, previous_status, status) if previous_status != status
         else
-          Account.create(
+          new_account = Account.create(
             account_id: account_id,
             requisition_id: req.id,
             status: status,
-            name: name
+            name: name,
+            iban: iban,
+            owner_name: owner_name
           )
-        end
-
-        if status != "READY"
-          notify_account_issue(account_id, status)
+          notify_status_change(new_account, nil, status) if status != "READY"
         end
       end
     end
@@ -77,17 +89,20 @@ class BankSync
     Account.where(lunch_money_id: nil).invert.where(status: "READY", last_synced_at: ..(Time.now - SYNC_INTERVAL)).each do |account|
       LOGGER.info "fetching transactions for account: #{account[:account_id]}"
       response = @nordigen.get_account_transactions(account[:account_id])
-      booked_transactions = response.dig("transactions", "booked")
+
+      if response["status_code"].to_i >= 400
+        LOGGER.warn "Transactions fetch failed for #{account[:account_id]}: #{response["detail"]}"
+        refresh_account_status(account)
+        next
+      end
+
       account.update(last_synced_at: Time.now)
 
+      booked_transactions = response.dig("transactions", "booked")
       if booked_transactions
         LOGGER.info "Found #{booked_transactions.size} transactions"
       else
         LOGGER.info "No transactions found"
-        if response["status_code"] >= 400
-          notify_account_issue(account[:account_id], response["detail"])
-        end
-
         next
       end
 
@@ -126,6 +141,41 @@ class BankSync
 
   private
 
+  def reconcile_renamed_account(req, current_account_ids, iban, new_account_id)
+    return nil if iban.to_s.empty?
+
+    candidates = Account.where(requisition_id: req.id, iban: iban)
+                        .exclude(account_id: current_account_ids).all
+
+    case candidates.size
+    when 1
+      LOGGER.info "Reconciling renamed account: #{candidates.first.account_id} -> #{new_account_id}"
+      candidates.first
+    when 0
+      nil
+    else
+      LOGGER.warn "Ambiguous reconciliation for IBAN #{iban} in requisition #{req.id}"
+      @pushover.push(
+        "Bank Sync: Ambiguous account match\n" \
+        "Multiple existing accounts share IBAN #{iban}. New account_id #{new_account_id} " \
+        "was created as a fresh row — relink with `setup --map_account #{new_account_id} --map_asset <ASSET_ID>`."
+      )
+      nil
+    end
+  end
+
+  def refresh_account_status(account)
+    metadata = @nordigen.get_account_metadata(account[:account_id])
+    new_status = metadata["status"]
+    previous_status = account[:status]
+    account.update(
+      status: new_status,
+      iban: metadata["iban"] || account.iban,
+      owner_name: metadata["owner_name"] || account.owner_name
+    )
+    notify_status_change(account, previous_status, new_status) if previous_status != new_status
+  end
+
   def notify_expired_requisition(requisition)
     message = "Bank Sync: Connection Expired\n"
     message += "Bank connection expired for #{requisition[:institution_id]}. Please recreate the requisition."
@@ -138,9 +188,15 @@ class BankSync
     @pushover.push(message)
   end
 
-  def notify_account_issue(account_id, status)
-    message = "Bank Sync: Account Issue\n"
-    message += "Account #{account_id} has status: #{status}."
+  def notify_status_change(account, previous_status, new_status)
+    label = account[:name].to_s.empty? ? account[:account_id] : "#{account[:name]} (#{account[:account_id]})"
+    message = if new_status == "READY"
+      "Bank Sync: Account Recovered\n#{label} is back to READY."
+    elsif previous_status.nil?
+      "Bank Sync: Account Issue\n#{label} synced with status #{new_status}."
+    else
+      "Bank Sync: Account Issue\n#{label} status changed: #{previous_status} -> #{new_status}."
+    end
     @pushover.push(message)
   end
 end

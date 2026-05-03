@@ -64,13 +64,31 @@ To create a new requisition for a bank:
 docker compose run gocardless-lunchmoney setup --create-requisition INSTITUTION_ID
 ```
 
-### Recreate Expired Requisition
+### Recreate Expired or Suspended Requisition
 
-To recreate a expired requisition:
+To recreate a requisition that is expired (`EX`), suspended (`SU`), or still
+linked (`LN`) but has one or more accounts in `SUSPENDED`/`ERROR` state:
 
 ```sh
 docker compose run gocardless-lunchmoney setup --recreate-requisition
 ```
+
+Before issuing the new requisition, this command refreshes account metadata
+(IBAN, owner name) from GoCardless. After you complete the bank's
+authorization flow and run `setup --sync-accounts`, the new GoCardless
+account_ids are auto-attached to the existing local Account rows by IBAN —
+preserving the LunchMoney asset mapping and transaction history. If a match
+is ambiguous, a Pushover notification tells you which accounts to relink
+manually with `--map_account`.
+
+### Avoiding Account Suspension
+
+GoCardless suspends an account after roughly 10 consecutive failed accesses
+(see [Account Suspension](https://ob.helpscoutdocs.com/article/151-account-suspension)).
+This sync stays well below that limit by default (one transactions call per
+account per 8-hour cycle) and will, on a 4xx during a transactions fetch,
+re-check the account's metadata and skip further calls until the account
+recovers.
 
 ### Sync Accounts
 
